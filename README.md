@@ -20,11 +20,11 @@ make linux
 <tr><td>bson.null</td><td>Null</td><td></td></tr>
 <tr><td>boolean</td><td>Boolean</td><td></td></tr>
 <tr><td>number</td><td>Double</td><td></td></tr>
-<tr><td>number</td><td>Int 32</td><td></td></tr>
+<tr><td>number</td><td>32-bit integer</td><td></td></tr>
 <tr><td>number</td><td>64-bit integer</td><td>precision lost</td></tr>
 <tr><td>string</td><td>String</td><td></td></tr>
 <tr><td>table</td><td>BSON Document</td><td></td></tr>
-<tr><td>table</td><td>BSON Array</td><td></td></tr>
+<tr><td>table</td><td>BSON Array</td><td>Lua table must be a sequence. (Continuous number key base 1)</td></tr>
 <tr><td>bson.date(os.time())</td><td>UTC Datetime</td><td>milliseconds since epoch</td></tr>
 <tr><td>bson.timestamp(os.time())</td><td>Timestamp</td><td>special mongodb type, two 32-bit number</td></tr>
 <tr><td>bson.regex(regex,option)</td><td>Regular Expression</td><td></td></tr>	
