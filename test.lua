@@ -13,6 +13,8 @@ b = bson.encode {
 	j = bson.objectid(),
 	k = { a = false, b = true },
 	l = {},
+	m = bson.minkey,
+	n = bson.maxkey,
 }
 
 t = b:decode()
@@ -20,4 +22,3 @@ t = b:decode()
 for k,v in pairs(t) do
 	print(k, bson.type(v))
 end
-

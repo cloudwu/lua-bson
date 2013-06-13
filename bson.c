@@ -308,7 +308,7 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 		size_t len;
 		const char * str = lua_tolstring(L,-1,&len);
 		if (len > 1 && str[0]==0) {
-			int subt = str[1];
+			int subt = (uint8_t)str[1];
 			append_key(bs, subt, key, sz);
 			switch(subt) {
 			case BSON_BINARY:
@@ -447,9 +447,7 @@ make_object(lua_State *L, int type, const void * ptr, size_t len) {
 	luaL_buffinit(L, &b);
 	luaL_addchar(&b, 0);
 	luaL_addchar(&b, type);
-	if (len>0) {
-		luaL_addlstring(&b, ptr, len);
-	}
+	luaL_addlstring(&b, ptr, len);
 	luaL_pushresult(&b);
 }
 
@@ -517,9 +515,11 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			make_object(L, BSON_DATE, &v, 4);
 			break;
 		}
+		case BSON_MINKEY:
+		case BSON_MAXKEY:
 		case BSON_NULL: {
-			char null[] = { 0, BSON_NULL };
-			lua_pushlstring(L, null, sizeof(null));
+			char key[] = { 0, bt };
+			lua_pushlstring(L, key, sizeof(key));
 			break;
 		}
 		case BSON_REGEX: {
@@ -579,10 +579,6 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			make_object(L, bt, ptr, sz);
 			break;
 		}
-		case BSON_MINKEY:
-		case BSON_MAXKEY:
-			make_object(L, bt, NULL, 0);
-			break;
 		default:
 			// unsupported
 			luaL_error(L, "Invalid bson type : %d", bt);
@@ -804,7 +800,7 @@ ltype(lua_State *L) {
 		size_t len = 0;
 		const char * str = lua_tolstring(L,1,&len);
 		if (str[0] == 0 && len >= 2) {
-			return lsubtype(L, str[1], (const uint8_t *)str+2, len-2);
+			return lsubtype(L, (uint8_t)str[1], (const uint8_t *)str+2, len-2);
 		} else {
 			type = 5;
 			break;
@@ -937,6 +933,12 @@ luaopen_bson(lua_State *L) {
 	char null[] = { 0, BSON_NULL };
 	lua_pushlstring(L, null, sizeof(null));
 	lua_setfield(L,-2,"null");
+	char minkey[] = { 0, BSON_MINKEY };
+	lua_pushlstring(L, minkey, sizeof(minkey));
+	lua_setfield(L,-2,"minkey");
+	char maxkey[] = { 0, BSON_MAXKEY };
+	lua_pushlstring(L, maxkey, sizeof(maxkey));
+	lua_setfield(L,-2,"maxkey");
 	init_oid_header();
 
 	return 1;
