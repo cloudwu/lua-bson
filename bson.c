@@ -865,7 +865,7 @@ init_oid_header() {
 	oid_header[3] = pid & 0xff;
 	oid_header[4] = (pid >> 8) & 0xff;
 
-	oid_counter = h ^ time(NULL) ^ (uint32_t)&h;
+	oid_counter = h ^ time(NULL) ^ (uintptr_t)&h;
 }
 
 static inline int
