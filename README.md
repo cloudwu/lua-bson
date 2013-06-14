@@ -29,8 +29,24 @@ make linux
 <tr><td>bson.timestamp(os.time())</td><td>Timestamp</td><td>special mongodb type, two 32-bit number</td></tr>
 <tr><td>bson.regex(regex,option)</td><td>Regular Expression</td><td></td></tr>	
 <tr><td>bson.objectid()</td><td>ObjectID</td><td><a href="http://www.mongodb.org/display/DOCS/Object+IDs">MongoDB document ID</a></td></tr>
+<tr><td>bson.minkey</td><td>Min Key</td><td></td></tr>
+<tr><td>bson.maxkey</td><td>Max Key</td><td></td></tr>
 <tbody>
 </table>
+
+## Replace field
+
+These bson types (fixed length) below can be replace by new value after encode to bson object.
+
+* int32
+* int64
+* double
+* boolean
+* date
+* timestamp
+* objectid
+
+You need call makeindex() before replace.
 
 ## Getting started
 
