@@ -200,7 +200,6 @@ write_int32(struct bson *b, int32_t v) {
 static inline void
 write_length(struct bson *b, int32_t v, int off) {
 	uint32_t uv = (uint32_t)v;
-	bson_reserve(b,4);
 	b->ptr[off++] = uv & 0xff;
 	b->ptr[off++] = (uv >> 8)&0xff;
 	b->ptr[off++] = (uv >> 16)&0xff;
