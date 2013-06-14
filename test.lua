@@ -1,5 +1,9 @@
 bson = require "bson"
 
+sub = bson.encode {
+	hello = "world"
+}
+
 b = bson.encode {
 	a = 1,
 	b = true,
@@ -15,6 +19,7 @@ b = bson.encode {
 	l = {},
 	m = bson.minkey,
 	n = bson.maxkey,
+	o = sub,
 }
 
 t = b:decode()
@@ -37,3 +42,5 @@ t = b:decode()
 for k,v in pairs(t) do
 	print(k, bson.type(v))
 end
+
+print("o.hello", bson.type(t.o.hello))

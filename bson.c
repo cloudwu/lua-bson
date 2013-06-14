@@ -306,6 +306,15 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	case LUA_TNUMBER:
 		append_number(bs, L, key, sz);
 		break;
+	case LUA_TUSERDATA: {
+		append_key(bs, BSON_DOCUMENT, key, sz);
+		int32_t * doc = lua_touserdata(L,-1);
+		int32_t sz = *doc;
+		bson_reserve(bs,sz);
+		memcpy(bs->ptr + bs->size, doc, sz);
+		bs->size += sz;
+		break;
+	}
 	case LUA_TSTRING: {
 		size_t len;
 		const char * str = lua_tolstring(L,-1,&len);
