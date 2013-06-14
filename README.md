@@ -34,6 +34,20 @@ make linux
 <tbody>
 </table>
 
+## Replace field
+
+These bson types (fixed length) below can be replace by new value after encode to bson object.
+
+* int32
+* int64
+* double
+* boolean
+* date
+* timestamp
+* objectid
+
+You need call makeindex() before replace.
+
 ## Getting started
 
 See test.lua

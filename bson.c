@@ -51,6 +51,8 @@ init_winsock() {
 #define BSON_MINKEY 255
 #define BSON_MAXKEY 127
 
+#define BSON_TYPE_SHIFT 5
+
 static char bson_numstrs[MAX_NUMBER][4];
 static int bson_numstr_len[MAX_NUMBER];
 
@@ -568,7 +570,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 		case BSON_SYMBOL: {
 			const void * ptr = t.ptr;
 			int sz = read_int32(L, &t);
-			read_bytes(L, &t, sz+12);
+			read_bytes(L, &t, sz);
 			make_object(L, bt, ptr, sz + 4);
 			break;
 		}
@@ -587,6 +589,177 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 		}
 		lua_rawset(L,-3);
 	}
+}
+
+static int
+lmakeindex(lua_State *L) {
+	int32_t *bson = luaL_checkudata(L,1,"bson");
+	const uint8_t * start = (const uint8_t *)bson;
+	struct bson_reader br = { start+4, *bson - 5 };
+	lua_newtable(L);
+
+	for (;;) {
+		if (br.size == 0)
+			break;
+		int bt = read_byte(L, &br);
+		size_t klen = 0;
+		const char * key = read_cstring(L, &br, &klen);
+		int field_size = 0;
+		switch (bt) {
+		case BSON_INT64:
+		case BSON_TIMESTAMP: 
+		case BSON_DATE:
+		case BSON_REAL:
+			field_size = 8;
+			break;
+		case BSON_BOOLEAN:
+			field_size = 1;
+			break;
+		case BSON_JSCODE:
+		case BSON_SYMBOL: 
+		case BSON_STRING: {
+			int sz = read_int32(L, &br);
+			read_bytes(L, &br, sz);
+			break;
+		}
+		case BSON_CODEWS:
+		case BSON_ARRAY:
+		case BSON_DOCUMENT: {
+			int sz = read_int32(L, &br);
+			read_bytes(L, &br, sz-4);
+			break;
+		}
+		case BSON_BINARY: {
+			int sz = read_int32(L, &br);
+			read_bytes(L, &br, sz+1);
+			break;
+		}
+		case BSON_OBJECTID:
+			field_size = 12;
+			break;
+		case BSON_MINKEY:
+		case BSON_MAXKEY:
+		case BSON_NULL:
+			break;
+		case BSON_REGEX: {
+			size_t rlen1=0;
+			size_t rlen2=0;
+			read_cstring(L, &br, &rlen1);
+			read_cstring(L, &br, &rlen2);
+			break;
+		}
+		case BSON_INT32:
+			field_size = 4;
+			break;
+		case BSON_DBPOINTER: {
+			int sz = read_int32(L, &br);
+			read_bytes(L, &br, sz+12);
+			break;
+		}
+		default:
+			// unsupported
+			luaL_error(L, "Invalid bson type : %d", bt);
+			lua_pop(L,1);
+			continue;
+		}
+		if (field_size > 0) {
+			int id = bt | (int)(br.ptr - start) << BSON_TYPE_SHIFT;
+			read_bytes(L, &br, field_size);
+			lua_pushlstring(L, key, klen);
+			lua_pushinteger(L,id);
+			lua_rawset(L,-3);
+		}
+	}
+	lua_setuservalue(L,1);
+	lua_settop(L,1);
+
+	return 1;
+}
+
+static void
+replace_object(lua_State *L, int type, struct bson * bs) {
+	size_t len = 0;
+	const char * data = luaL_checklstring(L,3, &len);
+	if (len < 6 || data[0] != 0 || data[1] != type) {
+		luaL_error(L, "Type mismatch, need bson type %d", type);
+	}
+	switch (type) {
+	case BSON_OBJECTID:
+		if (len != 2+12) {
+			luaL_error(L, "Invalid object id");
+		}
+		memcpy(bs->ptr, data+2, 12);
+		break;
+	case BSON_DATE: {
+		if (len != 2+4) {
+			luaL_error(L, "Invalid date");
+		}
+		const uint32_t * ts = (const uint32_t *)(data + 2);
+		int64_t v = (int64_t)*ts * 1000;
+		write_int64(bs, v);
+		break;
+	}
+	case BSON_TIMESTAMP: {
+		if (len != 2+8) {
+			luaL_error(L, "Invalid timestamp");
+		}
+		const uint32_t * inc = (const uint32_t *)(data + 2);
+		const uint32_t * ts = (const uint32_t *)(data + 6);
+		write_int32(bs, *inc);
+		write_int32(bs, *ts);
+		break;
+	}
+	}
+}
+
+static int
+lreplace(lua_State *L) {
+	lua_getuservalue(L,1);
+	if (!lua_istable(L,-1)) {
+		return luaL_error(L, "call makeindex first");
+	}
+	lua_pushvalue(L,2);
+	lua_rawget(L, -2);
+	if (!lua_isnumber(L,-1)) {
+		return luaL_error(L, "Can't replace key : %s", lua_tostring(L,2));
+	}
+	int id = lua_tointeger(L, -1);
+	int type = id & ((1<<(BSON_TYPE_SHIFT)) - 1);
+	int offset = id >> BSON_TYPE_SHIFT;
+	uint8_t * start = lua_touserdata(L,1);
+	struct bson b = { 0,16, start + offset };
+	switch (type) {
+	case BSON_REAL:
+		write_double(&b, luaL_checknumber(L, 3));
+		break;
+	case BSON_BOOLEAN:
+		write_byte(&b, lua_toboolean(L,3));
+		break;
+	case BSON_OBJECTID:
+	case BSON_DATE:
+	case BSON_TIMESTAMP:
+		replace_object(L, type, &b);
+		break;
+	case BSON_INT32: {
+		double d = luaL_checknumber(L,3);
+		int32_t i = lua_tointeger(L,3);
+		if ((int32_t)d != i) {
+			luaL_error(L, "%f must be a 32bit integer ", d);
+		}
+		write_int32(&b, i);
+		break;
+	}
+	case BSON_INT64: {
+		double d = luaL_checknumber(L,3);
+		lua_Integer i = lua_tointeger(L,3);
+		if ((lua_Integer)d != i) {
+			luaL_error(L, "%f must be a 64bit integer ", d);
+		}
+		write_int64(&b, i);
+		break;
+	}
+	}
+	return 0;
 }
 
 static int
@@ -615,6 +788,7 @@ lencode(lua_State *L) {
 	if (luaL_newmetatable(L, "bson")) {
 		luaL_Reg l[] = {
 			{ "decode", ldecode },
+			{ "makeindex", lmakeindex },
 			{ NULL, NULL },
 		};
 		luaL_newlib(L,l);
@@ -623,6 +797,8 @@ lencode(lua_State *L) {
 		lua_setfield(L, -2, "__tostring");
 		lua_pushcfunction(L, llen);
 		lua_setfield(L, -2, "__len");
+		lua_pushcfunction(L, lreplace);
+		lua_setfield(L, -2, "__newindex");
 	}
 	lua_setmetatable(L, -2);
 	return 1;

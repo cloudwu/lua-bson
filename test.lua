@@ -22,3 +22,18 @@ t = b:decode()
 for k,v in pairs(t) do
 	print(k, bson.type(v))
 end
+
+b:makeindex()
+b.a = 2
+b.b = false
+b.h = bson.date(os.time())
+b.i = bson.timestamp(os.time())
+b.j = bson.objectid()
+
+print "after replace"
+
+t = b:decode()
+
+for k,v in pairs(t) do
+	print(k, bson.type(v))
+end
