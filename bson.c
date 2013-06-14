@@ -804,7 +804,7 @@ ltype(lua_State *L) {
 		size_t len = 0;
 		const char * str = lua_tolstring(L,1,&len);
 		if (str[0] == 0 && len >= 2) {
-			return lsubtype(L, str[1], (const uint8_t *)str+2, len-2);
+			return lsubtype(L, (uint8_t)str[1], (const uint8_t *)str+2, len-2);
 		} else {
 			type = 5;
 			break;
