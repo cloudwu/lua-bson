@@ -276,17 +276,21 @@ append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 static void
 append_table(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	size_t len = lua_rawlen(L, -1);
+	bool isarray = false;
 	if (len > 0) {
 		lua_pushinteger(L, len);
+		if (lua_next(L,-2) == 0) {
+			isarray = true;
+		} else {
+			lua_pop(L,2);
+		}
 	}
-	if (len == 0 || lua_next(L, -2) == 0) {
-		append_key(bs, BSON_DOCUMENT, key, sz);
-		pack_dict(L, bs);
-	} else {
-		lua_pop(L,2);
+	if (isarray) {
 		append_key(bs, BSON_ARRAY, key, sz);
-		pack_dict(L, bs);
+	} else {
+		append_key(bs, BSON_DOCUMENT, key, sz);
 	}
+	pack_dict(L, bs);
 }
 
 static void
