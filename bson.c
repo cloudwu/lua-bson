@@ -280,11 +280,11 @@ append_table(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 		lua_pushinteger(L, len);
 	}
 	if (len == 0 || lua_next(L, -2) == 0) {
-		append_key(bs, BSON_ARRAY, key, sz);
+		append_key(bs, BSON_DOCUMENT, key, sz);
 		pack_dict(L, bs);
 	} else {
 		lua_pop(L,2);
-		append_key(bs, BSON_DOCUMENT, key, sz);
+		append_key(bs, BSON_ARRAY, key, sz);
 		pack_dict(L, bs);
 	}
 }
