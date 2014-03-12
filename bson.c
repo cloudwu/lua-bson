@@ -856,7 +856,7 @@ lencode(lua_State *L) {
 }
 
 static int
-lencode_sorted(lua_State *L) {
+lencode_order(lua_State *L) {
 	struct bson b;
 	bson_create(&b);
 	int n = lua_gettop(L);
@@ -1160,7 +1160,7 @@ luaopen_bson(lua_State *L) {
 	}
 	luaL_Reg l[] = {
 		{ "encode", lencode },
-		{ "encode_sorted", lencode_sorted },
+		{ "encode_order", lencode_order },
 		{ "date", ldate },
 		{ "timestamp", ltimestamp  },
 		{ "regex", lregex },

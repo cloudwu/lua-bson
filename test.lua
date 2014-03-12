@@ -1,8 +1,6 @@
 bson = require "bson"
 
-sub = bson.encode {
-	hello = "world"
-}
+sub = bson.encode_order( "hello", 1, "world", 2 )
 
 b = bson.encode {
 	a = 1,
