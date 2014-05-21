@@ -457,7 +457,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 }
 
 static void
-pack_sorted_dict(lua_State *L, struct bson *b, int n) {
+pack_ordered_dict(lua_State *L, struct bson *b, int n) {
 	int length = reserve_length(b);
 	int i;
 	for (i=0;i<n;i+=2) {
@@ -861,9 +861,9 @@ lencode_order(lua_State *L) {
 	bson_create(&b);
 	int n = lua_gettop(L);
 	if (n%2 != 0) {
-		return luaL_error(L, "Invalid sorted dict");
+		return luaL_error(L, "Invalid ordered dict");
 	}
-	pack_sorted_dict(L, &b, n);
+	pack_ordered_dict(L, &b, n);
 	lua_settop(L,1);
 	void * ud = lua_newuserdata(L, b.size);
 	memcpy(ud, b.ptr, b.size);
