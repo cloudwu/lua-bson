@@ -18,6 +18,7 @@ b = bson.encode {
 	m = bson.minkey,
 	n = bson.maxkey,
 	o = sub,
+	p = 2^32-1,
 }
 
 t = b:decode()
