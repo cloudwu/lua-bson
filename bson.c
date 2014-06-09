@@ -820,7 +820,9 @@ ldecode(lua_State *L) {
 	if (data == NULL) {
 		return 0;
 	}
-	struct bson_reader br = { (const uint8_t *)data , *data };
+	const uint8_t * b = (const uint8_t *)data;
+	int32_t len = b[0] | b[1]<<8 | b[2]<<16 | b[3]<<24;
+	struct bson_reader br = { b , len };
 
 	unpack_dict(L, &br, false);
 
