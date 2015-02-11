@@ -21,7 +21,7 @@ make linux
 <tr><td>boolean</td><td>Boolean</td><td></td></tr>
 <tr><td>number</td><td>Double</td><td></td></tr>
 <tr><td>number</td><td>32-bit integer</td><td></td></tr>
-<tr><td>number</td><td>64-bit integer</td><td>precision lost</td></tr>
+<tr><td>number</td><td>64-bit integer</td><td>precision lost in lua 5.1/5.2</td></tr>
 <tr><td>string</td><td>String</td><td></td></tr>
 <tr><td>table</td><td>BSON Document</td><td></td></tr>
 <tr><td>table</td><td>BSON Array</td><td>Lua table must be a sequence. (Continuous number key base 1)</td></tr>

@@ -261,6 +261,29 @@ append_key(struct bson *bs, int type, const char *key, size_t sz) {
 	write_string(bs, key, sz);
 }
 
+#if LUA_VERSION_NUM >= 503
+
+static void
+append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
+	if (lua_isinteger(L, -1)) {
+		int64_t i = lua_tointeger(L, -1);
+		int si = i >> 31;
+		if (si == 0 || si == -1) {
+			append_key(bs, BSON_INT32, key, sz);
+			write_int32(bs, i);
+		} else {
+			append_key(bs, BSON_INT64, key, sz);
+			write_int64(bs, i);
+		}
+	} else {
+		lua_Number d = lua_tonumber(L,-1);
+		append_key(bs, BSON_REAL, key, sz);
+		write_double(bs, d);
+	}
+}
+
+#else
+
 static void
 append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	int64_t i = lua_tointeger(L, -1);
@@ -279,6 +302,7 @@ append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 		}
 	}
 }
+#endif
 
 static void
 append_table(struct bson *bs, lua_State *L, const char *key, size_t sz) {
@@ -433,7 +457,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 				luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
 				return;
 			}
-			sz = bson_numstr(numberkey, lua_tounsigned(L,-2)-1);
+			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
 			key = numberkey;
 
 			append_one(b, L, key, sz);
@@ -796,6 +820,24 @@ lreplace(lua_State *L) {
 	case BSON_TIMESTAMP:
 		replace_object(L, type, &b);
 		break;
+#if LUA_VERSION_NUM >= 503
+	case BSON_INT32: {
+		if (!lua_isinteger(L, 3)) {
+			luaL_error(L, "%f must be a 32bit integer ", lua_tonumber(L, 3));
+		}
+		int32_t i = lua_tointeger(L,3);
+		write_int32(&b, i);
+		break;
+	}
+	case BSON_INT64: {
+		if (!lua_isinteger(L, 3)) {
+			luaL_error(L, "%f must be a 64bit integer ", lua_tonumber(L, 3));
+		}
+		int64_t i = lua_tointeger(L,3);
+		write_int64(&b, i);
+		break;
+	}
+#else
 	case BSON_INT32: {
 		double d = luaL_checknumber(L,3);
 		int32_t i = lua_tointeger(L,3);
@@ -814,6 +856,7 @@ lreplace(lua_State *L) {
 		write_int64(&b, i);
 		break;
 	}
+#endif
 	default:
 		luaL_error(L, "Can't replace type %d", type);
 		break;
@@ -912,7 +955,7 @@ ltimestamp(lua_State *L) {
 		luaL_addlstring(&b, (const char *)&inc, sizeof(inc));
 		++inc;
 	} else {
-		uint32_t i = lua_tounsigned(L,2);
+		uint32_t i = (uint32_t)lua_tointeger(L,2);
 		luaL_addlstring(&b, (const char *)&i, sizeof(i));
 	}
 	luaL_addlstring(&b, (const char *)&d, sizeof(d));
@@ -996,8 +1039,8 @@ lsubtype(lua_State *L, int subtype, const uint8_t * buf, size_t sz) {
 		}
 		const uint32_t * ts = (const uint32_t *)buf;
 		lua_pushvalue(L, lua_upvalueindex(8));
-		lua_pushunsigned(L, ts[1]);
-		lua_pushunsigned(L, ts[0]);
+		lua_pushinteger(L, (lua_Integer)ts[1]);
+		lua_pushinteger(L, (lua_Integer)ts[0]);
 		return 3;
 	}
 	case BSON_REGEX: {

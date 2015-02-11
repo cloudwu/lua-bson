@@ -1,4 +1,4 @@
-LUALIB=-I/usr/local/include -L/usr/local/bin -llua52
+LUALIB=-I/usr/local/include -L/usr/local/bin -llua53
 SOCKETLIB=-lws2_32
 
 .PHONY: all win linux
