@@ -263,12 +263,16 @@ append_key(struct bson *bs, int type, const char *key, size_t sz) {
 
 #if LUA_VERSION_NUM >= 503
 
+static inline int
+is_32bit(int64_t v) {
+	return v >= INT32_MIN && v <= INT32_MAX;
+}
+
 static void
 append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	if (lua_isinteger(L, -1)) {
 		int64_t i = lua_tointeger(L, -1);
-		int si = i >> 31;
-		if (si == 0 || si == -1) {
+		if (is_32bit(i)) {
 			append_key(bs, BSON_INT32, key, sz);
 			write_int32(bs, i);
 		} else {
@@ -292,8 +296,7 @@ append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 		append_key(bs, BSON_REAL, key, sz);
 		write_double(bs, d);
 	} else {
-		int si = i >> 31;
-		if (si == 0 || si == -1) {
+		if (is_32bit(i)) {
 			append_key(bs, BSON_INT32, key, sz);
 			write_int32(bs, i);
 		} else {
