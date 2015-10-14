@@ -29,6 +29,8 @@ init_winsock() {
 
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024
+// avoid circular reference while encoding
+#define MAX_DEPTH 128
 
 #define BSON_REAL 1
 #define BSON_STRING 2
@@ -253,7 +255,7 @@ write_double(struct bson *b, lua_Number d) {
 	}
 }
 
-static void pack_dict(lua_State *L, struct bson *b, bool array);
+static void pack_dict(lua_State *L, struct bson *b, bool array, int depth);
 
 static inline void
 append_key(struct bson *bs, int type, const char *key, size_t sz) {
@@ -308,7 +310,7 @@ append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 #endif
 
 static void
-append_table(struct bson *bs, lua_State *L, const char *key, size_t sz) {
+append_table(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth) {
 	size_t len = lua_rawlen(L, -1);
 	bool isarray = false;
 	if (len > 0) {
@@ -324,7 +326,7 @@ append_table(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	} else {
 		append_key(bs, BSON_DOCUMENT, key, sz);
 	}
-	pack_dict(L, bs, isarray);
+	pack_dict(L, bs, isarray, depth);
 }
 
 static void
@@ -337,7 +339,7 @@ write_binary(struct bson *b, const void * buffer, size_t sz) {
 }
 
 static void
-append_one(struct bson *bs, lua_State *L, const char *key, size_t sz) {
+append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth) {
 	int vt = lua_type(L,-1);
 	switch(vt) {
 	case LUA_TNUMBER:
@@ -425,7 +427,7 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 		break;
 	}
 	case LUA_TTABLE:
-		append_table(bs, L, key, sz);
+		append_table(bs, L, key, sz, depth + 1);
 		break;
 	case LUA_TBOOLEAN:
 		append_key(bs, BSON_BOOLEAN, key, sz);
@@ -447,8 +449,11 @@ bson_numstr( char *str, unsigned int i ) {
 }
 
 static void
-pack_dict(lua_State *L, struct bson *b, bool isarray) {
-	luaL_checkstack(L, 16);	// reserve enough stack space to pack table
+pack_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
+	if (depth > MAX_DEPTH) {
+		luaL_error(L, "Too depth while encoding bson");
+	}
+	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to pack table
 	int length = reserve_length(b);
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
@@ -464,7 +469,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
 			key = numberkey;
 
-			append_one(b, L, key, sz);
+			append_one(b, L, key, sz, depth);
 			lua_pop(L,1);
 		} else {
 			switch(kt) {
@@ -473,12 +478,12 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 				lua_pushvalue(L,-2);
 				lua_insert(L,-2);
 				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz);
+				append_one(b, L, key, sz, depth);
 				lua_pop(L,2);
 				break;
 			case LUA_TSTRING:
 				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz);
+				append_one(b, L, key, sz, depth);
 				lua_pop(L,1);
 				break;
 			default:
@@ -492,7 +497,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 }
 
 static void
-pack_ordered_dict(lua_State *L, struct bson *b, int n) {
+pack_ordered_dict(lua_State *L, struct bson *b, int n, int depth) {
 	int length = reserve_length(b);
 	int i;
 	for (i=0;i<n;i+=2) {
@@ -502,7 +507,7 @@ pack_ordered_dict(lua_State *L, struct bson *b, int n) {
 			luaL_error(L, "Argument %d need a string", i+1);
 		}
 		lua_pushvalue(L, i+2);
-		append_one(b, L, key, sz);
+		append_one(b, L, key, sz, depth);
 		lua_pop(L,1);
 	}
 	write_byte(b,0);
@@ -536,7 +541,7 @@ make_object(lua_State *L, int type, const void * ptr, size_t len) {
 
 static void
 unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
-	luaL_checkstack(L, 16);	// reserve enough stack space to unpack table
+	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to unpack table
 	int sz = read_int32(L, br);
 	const void * bytes = read_bytes(L, br, sz-5);
 	struct bson_reader t = { bytes, sz-5 };
@@ -910,7 +915,7 @@ lencode(lua_State *L) {
 	bson_create(&b);
 	lua_settop(L,1);
 	luaL_checktype(L, 1, LUA_TTABLE);
-	pack_dict(L, &b, false);
+	pack_dict(L, &b, false, 0);
 	void * ud = lua_newuserdata(L, b.size);
 	memcpy(ud, b.ptr, b.size);
 	bson_destroy(&b);
@@ -926,7 +931,7 @@ lencode_order(lua_State *L) {
 	if (n%2 != 0) {
 		return luaL_error(L, "Invalid ordered dict");
 	}
-	pack_ordered_dict(L, &b, n);
+	pack_ordered_dict(L, &b, n, 0);
 	lua_settop(L,1);
 	void * ud = lua_newuserdata(L, b.size);
 	memcpy(ud, b.ptr, b.size);
