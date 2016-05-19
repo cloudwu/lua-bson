@@ -15,7 +15,7 @@ bson.dll : bson.c
 	gcc --shared -Wall -O2 $^ -o$@ $(LUALIB) $(SOCKETLIB)
 
 bson.so : bson.c
-	gcc --shared -Wall -fPIC -O2 $^ -o$@ 
+	gcc --shared -Wall -fPIC -O2 $^ -o$@ $(LUALIB) -lm
 
 clean:
 	rm -f bson.dll bson.so
