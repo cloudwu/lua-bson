@@ -448,6 +448,45 @@ bson_numstr( char *str, unsigned int i ) {
 	}
 }
 
+static int
+pack_dict_data(lua_State *L, struct bson *b, bool isarray, int depth, int kt) {
+	char numberkey[32];
+	const char * key = NULL;
+	size_t sz;
+	if (isarray) {
+		if (kt != LUA_TNUMBER) {
+			luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
+			return 1;
+		}
+		sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
+		key = numberkey;
+
+		append_one(b, L, key, sz, depth);
+		lua_pop(L,1);
+	} else {
+		switch(kt) {
+		case LUA_TNUMBER:
+			// copy key, don't change key type
+			lua_pushvalue(L,-2);
+			lua_insert(L,-2);
+			key = lua_tolstring(L,-2,&sz);
+			append_one(b, L, key, sz, depth);
+			lua_pop(L,2);
+			break;
+		case LUA_TSTRING:
+			key = lua_tolstring(L,-2,&sz);
+			append_one(b, L, key, sz, depth);
+			lua_pop(L,1);
+			break;
+		default:
+			luaL_error(L, "Invalid key type : %s", lua_typename(L, kt));
+			return 2;
+		}
+	}
+
+	return 0;
+}
+
 static void
 pack_simple_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
 	if (depth > MAX_DEPTH) {
@@ -458,43 +497,14 @@ pack_simple_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
 		int kt = lua_type(L, -2);
-		char numberkey[32];
-		const char * key = NULL;
-		size_t sz;
-		if (isarray) {
-			if (kt != LUA_TNUMBER) {
-				luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
-				return;
-			}
-			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
-			key = numberkey;
-
-			append_one(b, L, key, sz, depth);
-			lua_pop(L,1);
-		} else {
-			switch(kt) {
-			case LUA_TNUMBER:
-				// copy key, don't change key type
-				lua_pushvalue(L,-2);
-				lua_insert(L,-2);
-				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz, depth);
-				lua_pop(L,2);
-				break;
-			case LUA_TSTRING:
-				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz, depth);
-				lua_pop(L,1);
-				break;
-			default:
-				luaL_error(L, "Invalid key type : %s", lua_typename(L, kt));
-				return;
-			}
-		}
+		if(pack_dict_data(L, b, isarray, depth, kt) != 0) {
+			return;
+		};
 	}
 	write_byte(b,0);
 	write_length(b, b->size - length, length);
 }
+
 
 static void
 pack_meta_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
@@ -517,40 +527,9 @@ pack_meta_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
 			lua_pop(L, 4); // pop all k, v, next_func, obj
 			break;
 		}
-
-		char numberkey[32];
-		const char * key = NULL;
-		size_t sz;
-		if (isarray) {
-			if (kt != LUA_TNUMBER) {
-				luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
-				return;
-			}
-			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
-			key = numberkey;
-
-			append_one(b, L, key, sz, depth);
-			lua_pop(L,1);
-		} else {
-			switch(kt) {
-			case LUA_TNUMBER:
-				// copy key, don't change key type
-				lua_pushvalue(L,-2);
-				lua_insert(L,-2);
-				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz, depth);
-				lua_pop(L,2);
-				break;
-			case LUA_TSTRING:
-				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz, depth);
-				lua_pop(L,1);
-				break;
-			default:
-				luaL_error(L, "Invalid key type : %s", lua_typename(L, kt));
-				return;
-			}
-		}
+		if(pack_dict_data(L, b, isarray, depth, kt) != 0) {
+			return;
+		};
 	}
 	write_byte(b,0);
 	write_length(b, b->size - length, length);
