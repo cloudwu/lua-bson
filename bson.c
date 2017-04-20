@@ -954,31 +954,60 @@ bson_meta(lua_State *L) {
 }
 
 static int
+encode_bson(lua_State *L) {
+	struct bson *b = lua_touserdata(L, 2);
+	lua_settop(L, 1);
+	pack_dict(L, b, false, 0);
+	void * ud = lua_newuserdata(L, b->size);
+	memcpy(ud, b->ptr, b->size);
+	return 1;
+}
+
+static int
 lencode(lua_State *L) {
 	struct bson b;
-	bson_create(&b);
 	lua_settop(L,1);
 	luaL_checktype(L, 1, LUA_TTABLE);
-	pack_dict(L, &b, false, 0);
-	void * ud = lua_newuserdata(L, b.size);
-	memcpy(ud, b.ptr, b.size);
+	bson_create(&b);
+	lua_pushcfunction(L, encode_bson);
+	lua_pushvalue(L, 1);
+	lua_pushlightuserdata(L, &b);
+	if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+		bson_destroy(&b);
+		return lua_error(L);
+	}
 	bson_destroy(&b);
 	bson_meta(L);
 	return 1;
 }
 
 static int
+encode_bson_byorder(lua_State *L) {
+	int n = lua_gettop(L);
+	struct bson *b = lua_touserdata(L, n);
+	lua_settop(L, n-1);
+	pack_ordered_dict(L, b, n-1, 0);
+	lua_settop(L,0);
+	void * ud = lua_newuserdata(L, b->size);
+	memcpy(ud, b->ptr, b->size);
+	return 1;
+}
+
+static int
 lencode_order(lua_State *L) {
 	struct bson b;
-	bson_create(&b);
 	int n = lua_gettop(L);
 	if (n%2 != 0) {
 		return luaL_error(L, "Invalid ordered dict");
 	}
-	pack_ordered_dict(L, &b, n, 0);
-	lua_settop(L,1);
-	void * ud = lua_newuserdata(L, b.size);
-	memcpy(ud, b.ptr, b.size);
+	bson_create(&b);
+	lua_pushcfunction(L, encode_bson_byorder);
+	lua_insert(L, 1);
+	lua_pushlightuserdata(L, &b);
+	if (lua_pcall(L, n+1, 1, 0) != LUA_OK) {
+		bson_destroy(&b);
+		return lua_error(L);
+	}
 	bson_destroy(&b);
 	bson_meta(L);
 	return 1;

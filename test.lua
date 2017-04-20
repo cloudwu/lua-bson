@@ -1,4 +1,4 @@
-bson = require "bson"
+local bson = require "bson"
 local Utils = require "utils"
 
 sub = bson.encode_order( "hello", 1, "world", 2 )
