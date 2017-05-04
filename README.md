@@ -23,6 +23,7 @@ make linux
 <tr><td>number</td><td>32-bit integer</td><td></td></tr>
 <tr><td>number</td><td>64-bit integer</td><td>precision lost in lua 5.1/5.2</td></tr>
 <tr><td>string</td><td>String</td><td></td></tr>
+<tr><td>bson.binary(blob)</td><td>Binary string</td><td>Use bson.type() to decode</td></tr>
 <tr><td>table</td><td>BSON Document</td><td></td></tr>
 <tr><td>table</td><td>BSON Array</td><td>Lua table must be a sequence. (Continuous number key base 1)</td></tr>
 <tr><td>bson.date(os.time())</td><td>UTC Datetime</td><td>milliseconds since epoch</td></tr>
@@ -33,6 +34,15 @@ make linux
 <tr><td>bson.maxkey</td><td>Max Key</td><td></td></tr>
 <tbody>
 </table>
+
+## Convert a bson value to lua string
+
+A value with bson type Null,Binary,MinKey,Maxkey,etc would be encoded in lua, you can use bson.type(v) to convent back to normal lua string.
+```Lua
+typestring, value = bson.type(bson.binary("Hello"))
+assert(typestring == "binary")
+assert(value == "Hello")
+```
 
 ## Replace field
 
