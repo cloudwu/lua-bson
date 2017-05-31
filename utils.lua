@@ -26,4 +26,12 @@ M.print_table = function(root)
     print(_dump(root, "",""))
 end
 
+M.hex_dump = function(b)
+    local s = tostring(b)
+    local format, sub = string.format, string.sub
+    for i = 1, #s do
+        print(format("\\x%02x", sub(s, i, i):byte()))
+    end
+end
+
 return M
